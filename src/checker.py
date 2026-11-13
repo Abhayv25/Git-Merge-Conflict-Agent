@@ -26,6 +26,7 @@ class RunSummary:
     conflicts_found: int = 0
     notifications_sent: int = 0
     skipped_already_notified: int = 0
+    resolved: int = 0
     errors: int = 0
     duration_ms: int = 0
 
@@ -65,13 +66,16 @@ def run_check(
         for branch_a, branch_b in _candidate_pairs(overlaps):
             key = build_collision_key(branch_a.branch_name, branch_b.branch_name)
             try:
-                if store.has_been_notified(key):
-                    summary.skipped_already_notified += 1
-                    continue
-
+                # Always re-run the merge check (it takes milliseconds), even
+                # for pairs already announced. That is the only way to notice
+                # a conflict was resolved, and clearing it means the pair gets
+                # a fresh alert if a later push makes them conflict again.
                 summary.pairs_checked += 1
                 result = check_merge_conflict(repo_path, branch_a, branch_b)
                 if not result.has_conflict:
+                    if store.has_been_notified(key):
+                        store.release(key)
+                        summary.resolved += 1
                     continue
                 summary.conflicts_found += 1
 
