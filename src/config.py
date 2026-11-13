@@ -36,18 +36,6 @@ def load_config(repo_path: str) -> MergewatchConfig:
     defaults. Should never raise -- a missing or malformed config file
     just means you fall back to DEFAULT_CONFIG, since the tool should
     still be able to run.
-
-    DONE. All four steps are implemented below:
-    1. Build config_path by joining repo_path with CONFIG_FILENAME.
-    2. If the file doesn't exist, fall back to a fresh copy of
-       DEFAULT_CONFIG.
-    3. Otherwise, try to open and json.load() it -- on any OSError or
-       json.JSONDecodeError (missing/unreadable file, corrupt JSON),
-       fall back to DEFAULT_CONFIG the same way.
-    4. Otherwise, build a new MergewatchConfig from DEFAULT_CONFIG's
-       values, overridden by whatever camelCase keys were actually
-       present in the parsed JSON (a config file that only sets one
-       field still gets sane defaults for the rest).
     """
     config_path = os.path.join(repo_path, CONFIG_FILENAME)
 
@@ -58,7 +46,7 @@ def load_config(repo_path: str) -> MergewatchConfig:
         with open(config_path) as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError) as e:
-        print(f"Invalid JSON")
+        print(f"Could not read {config_path}, using defaults: {e}")
         return dataclasses.replace(DEFAULT_CONFIG)
 
     return MergewatchConfig(
