@@ -83,3 +83,36 @@ def test_resolved_conflict_alerts_again_if_it_comes_back(tmp_path):
     again = run_check(repo, "main", [left, right], FileStateStore(state), sent.append)
     assert again.notifications_sent == 1
     assert len(sent) == 2
+
+
+def test_rename_on_one_branch_still_pairs_with_an_edit_on_another(tmp_path):
+    repo = str(tmp_path)
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "Test")
+    lines = "".join(f"line {i}\n" for i in range(20))
+    (tmp_path / "old.py").write_text(lines)
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "base")
+
+    # One branch renames the file and edits line 5...
+    _git(repo, "checkout", "-q", "-b", "rename", "main")
+    _git(repo, "mv", "old.py", "new.py")
+    (tmp_path / "new.py").write_text(lines.replace("line 5\n", "renamed side\n"))
+    _git(repo, "commit", "-qam", "rename and edit")
+
+    # ...the other edits the same line under the old name.
+    _git(repo, "checkout", "-q", "-b", "edit", "main")
+    (tmp_path / "old.py").write_text(lines.replace("line 5\n", "edit side\n"))
+    _git(repo, "commit", "-qam", "edit")
+    _git(repo, "checkout", "-q", "main")
+
+    branches = [
+        ActiveBranch("rename", "dev", 1, _git(repo, "rev-parse", "rename")),
+        ActiveBranch("edit", "dev", 2, _git(repo, "rev-parse", "edit")),
+    ]
+    sent = []
+    summary = run_check(repo, "main", branches, FileStateStore(str(tmp_path / "s.json")), sent.append)
+
+    assert summary.pairs_checked == 1
+    assert summary.conflicts_found == 1

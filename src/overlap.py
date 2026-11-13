@@ -18,8 +18,17 @@ class FileOverlap:
 
 
 def get_changed_files(repo_path: str, base_ref: str, head_sha: str) -> List[str]:
-    """Files changed on head_sha since it diverged from base_ref."""
-    result = run_git(repo_path, ["diff", "--name-only", f"{base_ref}...{head_sha}"])
+    """
+    Files changed on head_sha since it diverged from base_ref.
+
+    --no-renames reports a rename as its old path and its new path. With
+    rename detection on, git lists only the new path, so a branch that renamed
+    a file never overlapped with a branch that edited it under the old name,
+    and a real conflict between them was never checked.
+    """
+    result = run_git(
+        repo_path, ["diff", "--name-only", "--no-renames", f"{base_ref}...{head_sha}"]
+    )
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
