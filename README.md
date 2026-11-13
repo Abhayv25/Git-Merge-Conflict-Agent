@@ -1,6 +1,6 @@
-# GitHub Merge Conflict Agent
+# MergeWatch
 
-Watches a repository's active branches and warns a team before two of them
+A merge conflict predictor for GitHub repositories. It watches a repository's active branches and warns a team before two of them
 would actually conflict on merge, instead of letting someone discover it
 by trying to merge and failing. Detection is handled entirely by `git`
 itself, using `git merge-tree` to simulate a real three-way merge between
@@ -14,18 +14,29 @@ them and hit a real conflict.
    treated as an active branch (`src/poller.py`, via the GitHub REST API).
 2. **Find overlapping files.** For every active branch, diff it against
    the base branch to see which files it touched, then narrow down to
-   files touched by two or more branches at once (`src/overlap.py`). Most
+   branch pairs that touched at least one file in common
+   (`src/overlap.py`). Renames are listed under both their old and new path,
+   so a branch that renames a file still pairs with one that edits it. Most
    branch pairs don't touch the same files, so this cuts out a lot of
-   unnecessary work before the expensive step.
-3. **Check for a real conflict.** For each pair of branches that share a
-   file, run `git merge-tree --write-tree` between the two head commits.
+   unnecessary work before the merge check.
+3. **Check for a real conflict.** For each candidate pair, run
+   `git merge-tree --write-tree` once between the two head commits.
    This performs an actual in-memory three-way merge and reports whether it
-   would conflict (`src/merge_check.py`).
-4. **Notify once per conflict.** If a conflict is found, build a message
-   and post it to a Discord or Slack webhook (`src/notifier.py`). A state
-   store keeps track of which conflicts have already been reported, so a
-   job that runs every 15 minutes doesn't spam the same unresolved
-   conflict over and over (`src/state.py`).
+   would conflict, and in which files (`src/merge_check.py`).
+4. **Notify once per conflicting pair.** If a conflict is found, build one
+   message listing every conflicting file and post it to a Discord or Slack
+   webhook (`src/notifier.py`). A state store keeps track of which pairs
+   have already been reported, so a job that runs every 15 minutes doesn't
+   spam the same unresolved conflict over and over (`src/state.py`). Every
+   pair is re-checked on every run, so when a conflict is resolved its record
+   is cleared, and if a later push brings it back the team hears about it
+   again.
+
+   An alert looks like this:
+
+   > Merge conflict ahead: @alice (feature/oauth-login, PR #12) and @bob
+   > (fix/session-timeout, PR #15) would conflict if both were merged right
+   > now. Conflicting files: src/auth.js.
 
 `src/checker.py` ties these together. It has two entry points: an AWS
 Lambda function that runs every 15 minutes (`src/lambda_handler.py`), and
@@ -46,7 +57,7 @@ EventBridge Scheduler --every 15 min--> Lambda (container image from ECR)
 - **EventBridge Scheduler** invokes the function on a fixed rate.
 - **Lambda** runs the same Python code as the CLI, packaged as a Docker
   image (the stock Lambda Python images don't include git).
-- **DynamoDB** stores one item per announced conflict. Writes are
+- **DynamoDB** stores one item per announced conflicting branch pair. Writes are
   conditional, so two overlapping runs can never both send the same alert,
   and items expire after 30 days so an unresolved conflict gets a reminder.
 - **SSM Parameter Store** holds the GitHub token and webhook URL as
@@ -88,7 +99,7 @@ returned an error status counted as delivered.
 
 ```bash
 git clone <this repo>
-cd mergewatch
+cd merge-watch
 python3 -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -223,3 +234,7 @@ fixtures/
 infra/               Terraform: ECR, Lambda, EventBridge Scheduler, DynamoDB, alarms
 Dockerfile           Lambda container image
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).
