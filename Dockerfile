@@ -1,4 +1,4 @@
-# Container image for the AWS Lambda version of Mergewatch.
+# Container image for the AWS Lambda version of the Git Merge Conflict Agent.
 #
 # Lambda's own Python base images do not include git, so this starts from the
 # official Python image, installs git, and adds the AWS Lambda Runtime

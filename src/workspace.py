@@ -1,5 +1,5 @@
 """
-Brings a local git repository up to date with the commits Mergewatch needs:
+Brings a local git repository up to date with the commits the agent needs:
 the base branch and the head commit of every open pull request.
 
 PR heads are fetched from GitHub's refs/pull/<number>/head refs, which exist

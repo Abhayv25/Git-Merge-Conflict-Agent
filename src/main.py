@@ -49,7 +49,7 @@ def main() -> int:
             repo_path, github_clone_url(owner, repo), github_token, config.base_branch, branches
         )
     except (GitHubApiError, GitError) as e:
-        print(f"Mergewatch could not run: {e}", file=sys.stderr)
+        print(f"Git Merge Conflict Agent could not run: {e}", file=sys.stderr)
         return 1
 
     summary = run_check(

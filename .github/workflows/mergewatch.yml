@@ -1,4 +1,4 @@
-name: Mergewatch (manual run)
+name: Git Merge Conflict Agent (manual run)
 
 # The scheduled run now lives on AWS Lambda (see infra/). GitHub Actions'
 # cron is best-effort: on this repo a 15-minute schedule fired 5 times in
@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Mergewatch
+      - name: Run the conflict check
         run: python -m src.main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

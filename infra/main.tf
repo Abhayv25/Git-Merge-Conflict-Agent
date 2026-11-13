@@ -206,7 +206,7 @@ resource "aws_sns_topic_subscription" "email" {
 
 resource "aws_cloudwatch_metric_alarm" "failures" {
   alarm_name          = "${local.name}-failing"
-  alarm_description   = "Mergewatch failed twice in a row (GitHub API, git fetch, or webhook problems)."
+  alarm_description   = "Git Merge Conflict Agent failed twice in a row (GitHub API, git fetch, or webhook problems)."
   namespace           = "AWS/Lambda"
   metric_name         = "Errors"
   dimensions          = { FunctionName = aws_lambda_function.mergewatch.function_name }

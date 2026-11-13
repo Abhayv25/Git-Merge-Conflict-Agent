@@ -1,7 +1,7 @@
-# MergeWatch
+# Git Merge Conflict Agent
 
-A merge conflict predictor for GitHub repositories. It watches a repository's active branches and warns a team before two of them
-would actually conflict on merge, instead of letting someone discover it
+Watches a GitHub repository's active branches and warns a team before two
+of them would actually conflict on merge, instead of letting someone discover it
 by trying to merge and failing. Detection is handled entirely by `git`
 itself, using `git merge-tree` to simulate a real three-way merge between
 two branches in memory. There's no heuristic or guesswork involved: if the
@@ -99,7 +99,7 @@ returned an error status counted as delivered.
 
 ```bash
 git clone <this repo>
-cd merge-watch
+cd Git-Merge-Conflict-Agent
 python3 -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
