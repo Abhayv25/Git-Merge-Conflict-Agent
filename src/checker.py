@@ -9,11 +9,11 @@ repository, secrets, and state come from.
 import itertools
 import time
 from dataclasses import asdict, dataclass
-from typing import Callable, List
+from typing import Callable, Dict, List, Tuple
 
 from .merge_check import check_merge_conflict
 from .notifier import CollisionNotification, build_message
-from .overlap import find_overlapping_files
+from .overlap import FileOverlap, find_overlapping_files
 from .poller import ActiveBranch
 from .state import StateStore, build_collision_key
 
@@ -33,6 +33,20 @@ class RunSummary:
         return asdict(self)
 
 
+def _candidate_pairs(overlaps: List[FileOverlap]) -> List[Tuple[ActiveBranch, ActiveBranch]]:
+    """
+    Every branch pair that shares at least one changed file, each pair once.
+    Two PRs that both touch three files are still one merge to simulate, so
+    merge-tree runs once per pair rather than once per shared file.
+    """
+    pairs: Dict[Tuple[int, int], Tuple[ActiveBranch, ActiveBranch]] = {}
+    for overlap in overlaps:
+        for branch_a, branch_b in itertools.combinations(overlap.branches, 2):
+            first, second = sorted([branch_a, branch_b], key=lambda b: b.pr_number)
+            pairs.setdefault((first.pr_number, second.pr_number), (first, second))
+    return list(pairs.values())
+
+
 def run_check(
     repo_path: str,
     base_ref: str,
@@ -48,37 +62,35 @@ def run_check(
         overlaps = find_overlapping_files(repo_path, base_ref, branches)
         summary.overlapping_files = len(overlaps)
 
-        for overlap in overlaps:
-            for branch_a, branch_b in itertools.combinations(overlap.branches, 2):
-                key = build_collision_key(overlap.file, branch_a.branch_name, branch_b.branch_name)
+        for branch_a, branch_b in _candidate_pairs(overlaps):
+            key = build_collision_key(branch_a.branch_name, branch_b.branch_name)
+            try:
+                if store.has_been_notified(key):
+                    summary.skipped_already_notified += 1
+                    continue
+
+                summary.pairs_checked += 1
+                result = check_merge_conflict(repo_path, branch_a, branch_b)
+                if not result.has_conflict:
+                    continue
+                summary.conflicts_found += 1
+
+                if not store.claim(key):
+                    summary.skipped_already_notified += 1
+                    continue
+
+                message = build_message(
+                    CollisionNotification(branch_a, branch_b, result), use_llm_messages
+                )
                 try:
-                    if store.has_been_notified(key):
-                        summary.skipped_already_notified += 1
-                        continue
-
-                    summary.pairs_checked += 1
-                    result = check_merge_conflict(repo_path, branch_a, branch_b)
-                    if not result.has_conflict:
-                        continue
-                    summary.conflicts_found += 1
-
-                    if not store.claim(key):
-                        summary.skipped_already_notified += 1
-                        continue
-
-                    message = build_message(
-                        CollisionNotification(overlap.file, branch_a, branch_b, result),
-                        use_llm_messages,
-                    )
-                    try:
-                        notify(message)
-                    except Exception:
-                        store.release(key)  # try again next run instead of going silent
-                        raise
-                    summary.notifications_sent += 1
-                except Exception as e:
-                    summary.errors += 1
-                    print(f"Skipping {branch_a.branch_name} <-> {branch_b.branch_name}: {e}")
+                    notify(message)
+                except Exception:
+                    store.release(key)  # try again next run instead of going silent
+                    raise
+                summary.notifications_sent += 1
+            except Exception as e:
+                summary.errors += 1
+                print(f"Skipping {branch_a.branch_name} <-> {branch_b.branch_name}: {e}")
 
     store.flush()
     summary.duration_ms = int((time.monotonic() - started) * 1000)

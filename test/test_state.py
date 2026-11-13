@@ -9,8 +9,8 @@ from src.state import (
 
 
 def test_build_collision_key_is_order_independent():
-    a = build_collision_key("src/auth.js", "feature/a", "fix/b")
-    b = build_collision_key("src/auth.js", "fix/b", "feature/a")
+    a = build_collision_key("feature/a", "fix/b")
+    b = build_collision_key("fix/b", "feature/a")
     assert a == b
 
 

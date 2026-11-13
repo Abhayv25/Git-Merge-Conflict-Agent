@@ -27,11 +27,12 @@ class NotifiedCollision:
     notified_at: str
 
 
-def build_collision_key(file: str, branch_name_a: str, branch_name_b: str) -> str:
-    # Sort the branch names so (A, B) and (B, A) produce the same key --
-    # otherwise the same collision could get notified twice.
+def build_collision_key(branch_name_a: str, branch_name_b: str) -> str:
+    # One key per branch pair, not per file: two PRs that conflict in three
+    # files are one problem and get one alert. Sorting makes (A, B) and
+    # (B, A) the same key.
     first, second = sorted([branch_name_a, branch_name_b])
-    return f"{file}::{first}::{second}"
+    return f"{first}::{second}"
 
 
 def load_state(state_file_path: str) -> List[NotifiedCollision]:

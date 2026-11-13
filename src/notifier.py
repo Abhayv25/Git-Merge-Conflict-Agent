@@ -17,18 +17,21 @@ from .poller import ActiveBranch
 
 @dataclass
 class CollisionNotification:
-    file: str
     branch_a: ActiveBranch
     branch_b: ActiveBranch
     conflict: ConflictResult
 
 
+def _files_text(notification: CollisionNotification) -> str:
+    return ", ".join(notification.conflict.conflicting_files) or "(files not reported)"
+
+
 def _template_message(notification: CollisionNotification) -> str:
+    a, b = notification.branch_a, notification.branch_b
     return (
-        f"Possible collision on {notification.file}: "
-        f"@{notification.branch_a.author} ({notification.branch_a.branch_name}) and "
-        f"@{notification.branch_b.author} ({notification.branch_b.branch_name}) "
-        f"both changed this file, and merging both right now would conflict."
+        f"Merge conflict ahead: @{a.author} ({a.branch_name}, PR #{a.pr_number}) and "
+        f"@{b.author} ({b.branch_name}, PR #{b.pr_number}) would conflict if both "
+        f"were merged right now. Conflicting files: {_files_text(notification)}."
     )
 
 
@@ -40,7 +43,7 @@ def _llm_message(notification: CollisionNotification) -> Optional[str]:
     prompt = (
         "Rewrite this as one short, friendly message for a team chat, no more "
         "than two sentences. Don't invent any details beyond what's given.\n\n"
-        f"File: {notification.file}\n"
+        f"Conflicting files: {_files_text(notification)}\n"
         f"Branch A: {notification.branch_a.branch_name} (by {notification.branch_a.author})\n"
         f"Branch B: {notification.branch_b.branch_name} (by {notification.branch_b.author})\n"
         "These two branches would conflict if merged right now."
